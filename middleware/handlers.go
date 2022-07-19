@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http" // used to access the request and response object of the api
+	"strconv"
 
 	// used to read the environment variable
 	// package used to covert string into int type
@@ -14,6 +15,7 @@ import (
 	// used to get the params from the route
 
 	// package used to read the .env file
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq" // postgres golang driver
 	"github.com/usamarashid94/ToDo_ExerciseGo/models"
 )
@@ -58,6 +60,8 @@ func createConnection() *sql.DB {
 	return db
 }
 
+//------------------------- handlers ------------------------
+
 func GetTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -100,7 +104,69 @@ func AddTask(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func DeleteTask(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	params := mux.Vars(r)
+
+	// convert the id in string to int
+	id, err := strconv.Atoi(params["id"])
+
+	if err != nil {
+		log.Fatalf("Unable to convert the string into int.  %v", err)
+	}
+
+	deletedRows := deleteTaskHandler(int64(id))
+
+	// format the message string
+	msg := fmt.Sprintf("Tasks updated successfully. Total rows/record affected %v", deletedRows)
+
+	// format the reponse message
+	res := response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	// send the response
+	json.NewEncoder(w).Encode(res)
+}
+
 //------------------------- handler functions ----------------
+
+func deleteTaskHandler(id int64) int64 {
+
+	// create the postgres db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the delete sql query
+	sqlStatement := `DELETE FROM "ToDoList" WHERE id=$1`
+
+	// execute the sql statement
+	res, err := db.Exec(sqlStatement, id)
+
+	if err != nil {
+		log.Fatalf("Unable to execute the query. %v", err)
+	}
+
+	// check how many rows affected
+	rowsAffected, err := res.RowsAffected()
+
+	if err != nil {
+		log.Fatalf("Error while checking the affected rows. %v", err)
+	}
+
+	fmt.Printf("Total rows/record affected %v", rowsAffected)
+
+	return rowsAffected
+}
+
 func AddTaskHandler(todo models.ToDo) int64 {
 
 	// create the postgres db connection

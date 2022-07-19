@@ -12,6 +12,7 @@ func Router() *mux.Router {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/api/tasks", middleware.GetTasks).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/task", middleware.AddTask).Methods("POST", "OPTIONS")
 	// router.HandleFunc("/api/user", middleware.GetAllUser).Methods("GET", "OPTIONS")
 	// router.HandleFunc("/api/newuser", middleware.CreateUser).Methods("POST", "OPTIONS")
 	// router.HandleFunc("/api/user/{id}", middleware.UpdateUser).Methods("PUT", "OPTIONS")

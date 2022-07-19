@@ -34,17 +34,11 @@ const (
 
 // create connection with postgres db
 func createConnection() *sql.DB {
-	// load .env file
-	//err := godotenv.Load(".env")
+
 	connString := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		HOST, PORT, USER, PASSWORD, DBNAME,
 	)
-
-	// if err != nil {
-	// 	log.Fatalf("Error loading .env file")
-	// }
-
 	// Open the connection
 	db, err := sql.Open("postgres", connString)
 
@@ -68,24 +62,81 @@ func GetTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	// get all the users in the db
-	users, err := getAllTasks()
+	tasks, err := getAllTasksHandler()
 
 	if err != nil {
-		log.Fatalf("Unable to get all user. %v", err)
+		log.Fatalf("Unable to get all tasks. %v", err)
 	}
 
-	// send all the users as response
-	json.NewEncoder(w).Encode(users)
+	json.NewEncoder(w).Encode(tasks)
 }
 
-func getAllTasks() ([]models.ToDo, error) {
+func AddTask(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// create an empty user of type models.User
+	var todo models.ToDo
+
+	// decode the json request to user
+	err := json.NewDecoder(r.Body).Decode(&todo)
+
+	if err != nil {
+		log.Fatalf("Unable to decode the request body.  %v", err)
+	}
+
+	// call insert user function and pass the user
+	insertID := AddTaskHandler(todo)
+
+	// format a response object
+	res := response{
+		ID:      insertID,
+		Message: "Task added successfully",
+	}
+
+	// send the response
+	json.NewEncoder(w).Encode(res)
+}
+
+//------------------------- handler functions ----------------
+func AddTaskHandler(todo models.ToDo) int64 {
+
 	// create the postgres db connection
 	db := createConnection()
 
 	// close the db connection
 	defer db.Close()
 
-	var users []models.ToDo
+	// create the insert sql query
+	sqlStatement := `INSERT INTO "ToDoList" (task, id, status) VALUES ($1, $2, $3) RETURNING id`
+
+	// the inserted id will store in this id
+	var id int64
+
+	// execute the sql statement
+	// Scan function will save the insert id in the id
+	err := db.QueryRow(sqlStatement, todo.Task, todo.ID, todo.Status).Scan(&id)
+
+	if err != nil {
+		log.Fatalf("Unable to execute the query. %v", err)
+	}
+
+	fmt.Printf("Inserted a single record %v", id)
+
+	// return the inserted id
+	return id
+}
+
+func getAllTasksHandler() ([]models.ToDo, error) {
+	// create the postgres db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	var todos []models.ToDo
 
 	// create the select sql query
 	sqlStatement := `SELECT * FROM "ToDoList"`
@@ -102,20 +153,18 @@ func getAllTasks() ([]models.ToDo, error) {
 
 	// iterate over the rows
 	for rows.Next() {
-		var user models.ToDo
+		var todo models.ToDo
 
 		// unmarshal the row object to user
-		err = rows.Scan(&user.Task, &user.ID, &user.Status)
+		err = rows.Scan(&todo.Task, &todo.ID, &todo.Status)
 
 		if err != nil {
 			log.Fatalf("Unable to scan the row. %v", err)
 		}
 
-		// append the user in the users slice
-		users = append(users, user)
+		todos = append(todos, todo)
 
 	}
-
 	// return empty user on error
-	return users, err
+	return todos, err
 }

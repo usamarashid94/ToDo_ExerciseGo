@@ -135,6 +135,47 @@ func DeleteTask(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+// UpdateUser update user's detail in the postgres db
+func UpdateTask(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// get the id from the request params, key is "id"
+	params := mux.Vars(r)
+
+	// convert the id type from string to int
+	id, err := strconv.Atoi(params["id"])
+
+	if err != nil {
+		log.Fatalf("Unable to convert the string into int.  %v", err)
+	}
+
+	var todo models.ToDo
+
+	err = json.NewDecoder(r.Body).Decode(&todo)
+
+	if err != nil {
+		log.Fatalf("Unable to decode the request body.  %v", err)
+	}
+
+	updatedRows := updateTaskHandler(int64(id), todo)
+
+	// format the message string
+	msg := fmt.Sprintf("Task updated successfully. Total rows/record affected %v", updatedRows)
+
+	// format the response message
+	res := response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	// send the response
+	json.NewEncoder(w).Encode(res)
+}
+
 //------------------------- handler functions ----------------
 
 func deleteTaskHandler(id int64) int64 {
@@ -233,4 +274,34 @@ func getAllTasksHandler() ([]models.ToDo, error) {
 	}
 	// return empty user on error
 	return todos, err
+}
+
+func updateTaskHandler(id int64, todo models.ToDo) int64 {
+
+	// create the postgres db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the update sql query
+	sqlStatement := `UPDATE "ToDoList" SET task=$2, status=$3 WHERE id=$1`
+
+	// execute the sql statement
+	res, err := db.Exec(sqlStatement, id, todo.Task, todo.Status)
+
+	if err != nil {
+		log.Fatalf("Unable to execute the query. %v", err)
+	}
+
+	// check how many rows affected
+	rowsAffected, err := res.RowsAffected()
+
+	if err != nil {
+		log.Fatalf("Error while checking the affected rows. %v", err)
+	}
+
+	fmt.Printf("Total rows/record affected %v", rowsAffected)
+
+	return rowsAffected
 }
